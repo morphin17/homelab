@@ -1,0 +1,10 @@
+---
+- name: Headscale
+  hosts: headscale
+  become: true
+  gather_facts: true
+  roles:
+    - role: ansible/collections/headscale/roles/prerequisites
+    - role: ansible/collections/headscale/roles/docker
+    - role: ansible/collections/headscale/roles/headscale
+    - role: ansible/collections/headscale/roles/management

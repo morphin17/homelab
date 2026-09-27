@@ -1,5 +1,5 @@
 ---
-# Значения по умолчанию для роли. Переопределяются в inventory/group_vars/hardening/main.yml
+# Значения по умолчанию для роли. Переопределяются в inventory/hosts.yml
 # (переменные группы имеют приоритет над defaults роли).
 user: admin
 ssh_port: 22

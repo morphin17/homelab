@@ -1,0 +1,73 @@
+---
+# Обновление только ACL-политики headscale — без docker pull, health-чеков и
+# subnet-router части ansible/playbooks/headscale.yml.
+#
+# ACL — это файл /opt/headscale/config/acl.json (внутри контейнера
+# /etc/headscale/acl.json, в config.yaml: policy.mode: file). Рендерится тем же
+# шаблоном и из тех же group_vars (inventory/group_vars/headscale.yml), что и
+# полный плейбук: headscale_groups, headscale_tag_owners, headscale_acl_rules,
+# поэтому содержимое файла от способа запуска не зависит.
+#
+# Политику headscale читает при старте, поэтому после изменения файла контейнер
+# перезапускается — то же, что делает handler restart headscale в роли.
+- name: Headscale ACL
+  hosts: headscale
+  become: true
+  gather_facts: false
+
+  vars:
+    # Шаблон берём из вендорной коллекции: держать вторую копию ACL-шаблона
+    # в своём слое — гарантированный рассинхрон с полным плейбуком.
+    headscale_acl_src: "{{ playbook_dir }}/../collections/headscale/roles/headscale/templates/acl.json.j2"
+    headscale_acl_dest: /opt/headscale/config/acl.json
+    headscale_compose_dir: /opt/headscale
+
+  tasks:
+    # validate прогоняет результат через json.tool до замены файла: битый сгенерированный
+    # JSON не останется на диске и не уронит headscale при следующем старте.
+    # backup сохраняет предыдущую версию рядом (acl.json.<timestamp>~) — это и есть откат.
+    - name: Deploy the ACL policy
+      ansible.builtin.template:
+        src: "{{ headscale_acl_src }}"
+        dest: "{{ headscale_acl_dest }}"
+        mode: "0640"
+        backup: true
+        validate: /usr/bin/python3 -m json.tool %s
+      register: acl
+
+    - name: Restart headscale to pick up the new policy
+      ansible.builtin.command:
+        cmd: docker compose restart headscale
+        chdir: "{{ headscale_compose_dir }}"
+      when: acl is changed
+      changed_when: true
+      register: acl_restart
+
+    # Если политика синтаксически валидна, но ссылается на несуществующий тег или
+    # группу, headscale не поднимется — health-эндпоинт это покажет.
+    - name: Wait for the headscale health endpoint
+      ansible.builtin.uri:
+        url: http://localhost:8080/health
+        method: GET
+        status_code: [200]
+        return_content: true
+      register: acl_health
+      until: acl_health.status == 200 and 'pass' in acl_health.content
+      retries: 12
+      delay: 5
+      when: acl_restart.changed | default(false)
+
+    - name: Show what was applied and how to roll back
+      ansible.builtin.debug:
+        msg: |-
+          ACL применён: {{ headscale_acl_dest }}
+          Правил в acls: {{ headscale_acl_rules | length }}, тегов: {{ headscale_tag_owners | length }}, групп: {{ headscale_groups | length }}
+          Предыдущая версия: {{ acl.backup_file | default('—') }}
+
+          Откат:
+            cp {{ acl.backup_file | default('<backup>') }} {{ headscale_acl_dest }}
+            cd {{ headscale_compose_dir }} && docker compose restart headscale
+
+          Если контейнер не поднялся — логи:
+            cd {{ headscale_compose_dir }} && docker compose logs headscale --tail=50
+      when: acl is changed

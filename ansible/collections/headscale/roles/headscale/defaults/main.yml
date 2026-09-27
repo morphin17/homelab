@@ -1,0 +1,49 @@
+---
+# Headscale role defaults
+
+# Set to true to force recreation of config and reset database
+headscale_force_recreate: false
+
+# Set to true to update config without wiping database
+headscale_update_config: false
+
+# Headscale container image (registry/repository without tag); the tag is headscale_version
+headscale_image: "headscale/headscale"
+
+# Headscale version / image tag
+headscale_version: "0.23.0"
+
+# Per-node HTTPS certificates (tailscale cert / tailscale serve --https).
+# Requires a build with dns.certificates support and a DNS provider token
+# that can write the ACME challenge TXT record into headscale_dns_cert_zone.
+headscale_dns_certificates_enabled: false
+headscale_dns_cert_provider: "cloudflare"
+headscale_dns_cert_zone: "{{ headscale_base_domain }}"
+headscale_dns_cert_ttl: "5m"
+headscale_dns_cert_propagation_wait: "30s"
+headscale_dns_cert_api_token: ""
+
+# Policy nodeAttrs (node capabilities). `https` is appended automatically when
+# headscale_dns_certificates_enabled is true — it is what makes tailscale
+# clients treat HTTPS as enabled instead of calling the unimplemented
+# /machine/feature/query endpoint.
+headscale_node_attrs: []
+
+# Network prefixes (CGNAT range)
+headscale_ipv4_prefix: "100.64.0.0/10"
+headscale_ipv6_prefix: "fd7a:115c:a1e0::/48"
+
+# DNS configuration
+headscale_dns_servers:
+  - "10.0.0.2"      # AWS VPC DNS
+  - "1.1.1.1"       # Cloudflare fallback
+
+# Magic DNS base domain
+headscale_base_domain: "vpn.example.com"
+
+# DERP configuration
+headscale_derp_enabled: true
+
+# Metrics
+headscale_metrics_enabled: true
+headscale_metrics_port: 9090

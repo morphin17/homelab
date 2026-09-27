@@ -1,0 +1,31 @@
+{% set node_attrs = (headscale_node_attrs | default([])) + ([{'target': ['*'], 'attr': ['https']}] if (headscale_dns_certificates_enabled | default(false) | bool) else []) %}
+{
+  "groups": {
+{% for group, members in headscale_groups.items() %}
+    "group:{{ group }}": {{ members | to_json }}{{ "," if not loop.last else "" }}
+{% endfor %}
+  },
+  "tagOwners": {
+{% for tag, owners in headscale_tag_owners.items() %}
+    "tag:{{ tag }}": {{ owners | to_json }}{{ "," if not loop.last else "" }}
+{% endfor %}
+  },
+  "acls": [
+{% for rule in headscale_acl_rules %}
+    {
+      "action": "accept",
+      "src": {{ rule.src | to_json }},
+      "dst": {{ rule.dst | to_json }}{% if rule.proto is defined %},
+      "proto": {{ rule.proto | to_json }}{% endif %}
+    }{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]{% if node_attrs | length > 0 %},
+  "nodeAttrs": [
+{% for na in node_attrs %}
+    {
+      "target": {{ na.target | to_json }},
+      "attr": {{ na.attr | to_json }}
+    }{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]{% endif %}
+}

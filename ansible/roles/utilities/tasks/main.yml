@@ -1,0 +1,33 @@
+---
+- name: Install the utilities
+  ansible.builtin.apt:
+    name: "{{ utilities_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# Официальный install_update_linux.sh по умолчанию кладёт бинарь в $HOME/.local/bin,
+# но каталог переопределяется переменной DIR — поэтому ставим сразу в /usr/local/bin
+# и переносить файл руками не нужно (install -Dm 755 сам создаёт каталог).
+# creates делает задачу идемпотентной: при повторном прогоне бинарь на месте и сеть
+# не дёргается (как обновить lazydocker — см. README роли).
+- name: Install lazydocker
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail &&
+      curl -fsSL {{ lazydocker_install_script_url }} | bash
+    chdir: /tmp
+    creates: "{{ lazydocker_bin_dir }}/lazydocker"
+    executable: /bin/bash
+  environment:
+    DIR: "{{ lazydocker_bin_dir }}"
+
+# apt сам скачивает .deb по URL (в пути есть ://) во временный файл, ставит его
+# и удаляет скачанное — отдельные get_url и file: absent не нужны. Задача
+# идемпотентна: модуль сравнивает версию из control-файла с установленной и
+# пропускает установку, если они совпадают. Обновление до нового релиза
+# происходит само, т.к. в URL latest.
+- name: Install k9s
+  ansible.builtin.apt:
+    deb: "{{ k9s_deb_url }}"
+    state: present

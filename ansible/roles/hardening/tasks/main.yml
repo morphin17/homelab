@@ -35,6 +35,18 @@
     state: present
     key: "{{ copy_local_key }}"
 
+# Отдельный файл в /etc/sudoers.d вместо правки /etc/sudoers: основной файл
+# не трогаем, а validate прогоняет содержимое через visudo до записи, поэтому
+# битый файл не может остаться на диске и сломать sudo целиком.
+- name: Allow sudo without password for the user
+  ansible.builtin.copy:
+    content: "{{ user }} ALL=(ALL) NOPASSWD:ALL\n"
+    dest: "/etc/sudoers.d/90-{{ user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
 - name: Disable remote login for root
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
@@ -69,8 +81,23 @@
   ansible.builtin.apt:
     autoremove: yes
 
-- name: Restart the SSH daemon
-  ansible.builtin.systemd:
-    state: restarted
-    name: ssh
+- name: Reboot the machine
+  ansible.builtin.shell:
+    cmd: sleep 2 && systemctl reboot
+  async: 1
+  poll: 0
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Switch the connection to the new SSH port
+  ansible.builtin.set_fact:
+    ansible_port: "{{ ssh_port }}"
+    ansible_user: "{{ user }}"
+  when: not ansible_check_mode
+
+- name: Wait for the machine to come back on the new SSH port
+  ansible.builtin.wait_for_connection:
+    delay: 10
+    timeout: 600
+  when: not ansible_check_mode
 

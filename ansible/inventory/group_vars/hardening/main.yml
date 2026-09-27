@@ -1,7 +1,0 @@
----
-user: charon
-ssh_port: 2222
-
-# TODO: ansible-vault
-password: password
-password_salt: passwordsalt

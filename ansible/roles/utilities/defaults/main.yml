@@ -1,0 +1,22 @@
+---
+# Значения по умолчанию для роли. Переопределяются в inventory/hosts.yml
+# (переменные группы имеют приоритет над defaults роли).
+#
+# curl/tar/ca-certificates здесь не «утилиты для работы», а зависимости установки
+# lazydocker: скрипт качает им tar.gz с GitHub по https.
+# xz-utils нужен python3-apt: apt-модуль распаковывает им control-файл .deb,
+# скачанного по URL (см. задачу установки k9s).
+utilities_packages:
+  - curl
+  - tar
+  - wget
+  - ca-certificates
+  - xz-utils
+  - neovim
+  - tmux
+  - net-tools
+
+lazydocker_bin_dir: /usr/local/bin
+lazydocker_install_script_url: https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh
+
+k9s_deb_url: https://github.com/derailed/k9s/releases/latest/download/k9s_linux_amd64.deb
