@@ -1,0 +1,7 @@
+---
+# Значения по умолчанию для роли. Переопределяются в inventory/group_vars/hardening/main.yml
+# (переменные группы имеют приоритет над defaults роли).
+user: admin
+ssh_port: 22
+
+copy_local_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_ed25519.pub') }}"

@@ -1,0 +1,76 @@
+---
+- name: update cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Update all installed packages
+  ansible.builtin.apt:
+    name: "*"
+    state: latest
+
+- name: Make sure NTP service is running
+  ansible.builtin.systemd:
+    state: started
+    name: systemd-timesyncd
+
+- name: Make sure we have a 'sudo' group
+  ansible.builtin.group:
+    name: sudo
+    state: present
+
+- name: Create a user with sudo privileges
+  ansible.builtin.user:
+    name: "{{ user }}"
+    state: present
+    groups: sudo
+    append: true
+    create_home: true
+    shell: /bin/bash
+    password: "{{ password | password_hash('sha512', password_salt) }}"
+    update_password: on_create
+
+- name: Set authorized key for remote user
+  ansible.posix.authorized_key:
+    user: "{{ user }}"
+    state: present
+    key: "{{ copy_local_key }}"
+
+- name: Disable remote login for root
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    state: present
+    regexp: '^#?\s*PermitRootLogin\s'
+    line: 'PermitRootLogin no'
+    validate: /usr/sbin/sshd -t -f %s
+
+- name: Change the SSH port
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    state: present
+    regexp: '^#?\s*Port\s'
+    line: 'Port {{ ssh_port }}'
+    validate: /usr/sbin/sshd -t -f %s
+
+# Отдельное rule: allow перед этим правилом добавляет обычный ACCEPT выше recent-правила,
+# и ограничение частоты подключений перестаёт применяться. limit сам открывает порт.
+- name: UFW - open SSH port with brute-force protection
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+
+- name: UFW - Deny other incoming traffic and enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Remove dependencies that are no longer required
+  ansible.builtin.apt:
+    autoremove: yes
+
+- name: Restart the SSH daemon
+  ansible.builtin.systemd:
+    state: restarted
+    name: ssh
+

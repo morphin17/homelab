@@ -1,0 +1,8 @@
+---
+- name: Hardening
+  hosts: hardening
+  become: true
+  gather_facts: true
+  roles:
+    - role: hardening
+      tags: [hardening]
